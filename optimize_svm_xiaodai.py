@@ -35,7 +35,6 @@ def data_normalization(p, columns):
         #     normal_features.append((math.log10(p.features[i]+1))/math.log10(tmp[1]))
         # else:
         #     normal_features.append(p.features[i])
-
         tmp1 = std_map[i]
         normal_features.append((p.features[i]-tmp1[0])/tmp1[1])
         #进行标准化处理new_x = (x-mean)/std
@@ -53,6 +52,7 @@ data_path = "/data/chengqj/myxiaodai.csv"
 col_remove = [0,1,2,4,25,26] + range(19,24) #
 
 data = sc.textFile(data_path)
+
 pdata = data.map(lambda line: load_rm(line, col_remove))
 
 
@@ -71,19 +71,18 @@ for i in xrange(f_length):
     std_v = math.sqrt(pdata.map(lambda p: p.features[i]).variance())
     std_map[i] = (mean_v, std_v)
 
-
 #数据处理
-# resample_time = pdata.filter(lambda p:p.label==0).count()/float(pdata.filter(lambda p:p.label==1).count())
-# pdata = pdata.filter(lambda p:p.label==0).union(pdata.filter(lambda p:p.label==1).sample(true, resample_time))
+resample_time = pdata.filter(lambda p:p.label==0).count()/float(pdata.filter(lambda p:p.label==1).count())
+pdata = pdata.filter(lambda p:p.label==0).union(pdata.filter(lambda p:p.label==1).sample(True, resample_time))
 normal_data = pdata.map(lambda p: data_normalization(p, f_length))
 
 
 #切分训练集和测试集
-(trianData, testData) = pdata.randomSplit([0.7, 0.3], seed=1)
+(trianData, testData) = normal_data.randomSplit([0.7, 0.3], seed=1)
 
 
 #训练模型
-inters = 100
+inters = 200
 reParam = 0
 model = SVMWithSGD.train(trianData, iterations = inters, \
     regParam=reParam, intercept=False)
@@ -92,8 +91,8 @@ model = SVMWithSGD.train(trianData, iterations = inters, \
 #评估模型
 LAP = testData.map(lambda p: (p.label, model.predict(p.features)))
 trainErr = LAP.filter(lambda (v, p):v!=p).count()/float(LAP.count())
-precision = LAP.filter(lambda (v,p):v==p==1).count()/float(LAP.filter(lambda (v,p):p==1).count())
-recall = LAP.filter(lambda (v, p): v==p==1).count()/float(LAP.filter(lambda (v,p):v==1).count())
+precision = LAP.filter(lambda (v,p):v==p and v==1).count()/float(LAP.filter(lambda (v,p):p==1).count())
+recall = LAP.filter(lambda (v, p): v==p and v==1).count()/float(LAP.filter(lambda (v,p):v==1).count())
 print("training Error = " + str(trainErr))
 print("TP/(TP+FP)" + str(precision) + "##########################")
 print("TP/(TP+FN)"+ str(recall) + "@@@@@@@@@@@@@@@@@@@@@@@@@")
